@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
 import { Model } from 'mongoose';
@@ -77,5 +77,46 @@ export class UsersService {
 
   async deleteStudent(id: string, coachId: string) {
     return this.userModel.findOneAndDelete({ _id: id, coachId });
+  }
+
+  async getCoaches() {
+    return this.userModel.find({ role: UserRole.COACH }).exec();
+  }
+  async findCoachById(id: string) {
+    const coach = await this.userModel.findOne({
+      _id: id,
+      role: UserRole.COACH,
+    }).select('name phone');
+
+    if (!coach) {
+      throw new NotFoundException('مربی مورد نظر یافت نشد');
+    }
+
+    return coach;
+  }
+
+  async selectCoach(studentId: string, coachId: string) {
+    // Check if coach exists
+    const coach = await this.userModel.findOne({
+      _id: coachId,
+      role: UserRole.COACH,
+    });
+
+    if (!coach) {
+      throw new BadRequestException('مربی مورد نظر یافت نشد');
+    }
+
+    // Update student's coach
+    const student = await this.userModel.findByIdAndUpdate(
+      studentId,
+      { coachId },
+      { new: true }
+    );
+
+    if (!student) {
+      throw new BadRequestException('کاربر یافت نشد');
+    }
+
+    return student;
   }
 }

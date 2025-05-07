@@ -45,4 +45,16 @@ export class AuthController {
     // user از گارد گرفته می‌شه
     return this.authService.login(req.user);
   }
+
+  @Post('reset-password')
+  async resetPassword(
+    @Body() body: { phone: string; code: string; newPassword: string },
+  ) {
+    await this.authService.resetPassword(
+      body.phone,
+      body.code,
+      body.newPassword,
+    );
+    return { message: 'رمز عبور با موفقیت تغییر کرد' };
+  }
 }

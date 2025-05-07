@@ -59,6 +59,10 @@ export class User {
 
   @Prop()
   premiumAt?: Date;
+
+  @Prop()
+  premiumExpiresAt?: Date;
+
   @Prop()
   profileImage?: string;
 }

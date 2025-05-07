@@ -3,6 +3,7 @@ import { ListQuery } from '../dto/list-query.dto';
 
 interface PaginateOptions<T> {
   coachId?: string;
+  studentId?: string;
   role?: string;
   searchFields?: string[];
   filters?: Record<string, any>;
@@ -21,6 +22,7 @@ export async function paginateQuery<T>(
   const where: Record<string, any> = {};
 
   if (opts.coachId) where.coachId = opts.coachId;
+  if (opts.studentId) where.studentId = opts.studentId;
   if (opts.role) where.role = opts.role;
 
   // فیلترهای دلخواه

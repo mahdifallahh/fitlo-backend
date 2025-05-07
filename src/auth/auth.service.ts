@@ -125,4 +125,28 @@ export class AuthService {
       token: this.jwtService.sign(payload),
     };
   }
+
+  async resetPassword(phone: string, code: string, newPassword: string): Promise<void> {
+    const otpData = this.otpStore.get(phone);
+
+    if (!otpData || Date.now() > otpData.expiresAt) {
+      this.otpStore.delete(phone);
+      throw new UnauthorizedException('کد منقضی شده یا موجود نیست');
+    }
+
+    if (otpData.code !== code) {
+      throw new UnauthorizedException('کد اشتباه است');
+    }
+
+    this.otpStore.delete(phone);
+
+    const user = await this.usersService.findByPhone(phone);
+    if (!user) {
+      throw new UnauthorizedException('کاربری با این شماره یافت نشد');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await this.usersService.update(user);
+  }
 }

@@ -12,9 +12,12 @@ import {
   UseInterceptors,
   BadRequestException,
   Query,
+  Request,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 import * as bcrypt from 'bcrypt';
 import { PremiumStatusEnum, UserRole } from './schemas/user.schema';
@@ -219,9 +222,37 @@ export class UsersController {
     @Req() req: RequestWithUser,
   ) {
     const url = `http://localhost:3000/uploads/receipts/${file.filename}`;
+    
+    // Get current user to check status
+    const user = await this.usersService.findById(req.user.userId);
+    
+    // If user is already premium, don't allow new receipt
+    if (user?.premiumStatus === PremiumStatusEnum.ACCEPTED) {
+      throw new BadRequestException('شما قبلاً کاربر پرمیوم هستید');
+    }
+
+    // Update receipt and set status to pending
     return this.usersService.updateForReceipt(req.user.userId, {
       receiptUrl: url,
       premiumStatus: PremiumStatusEnum.PENDING,
     });
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('coaches')
+  async getCoaches() {
+    return this.usersService.getCoaches();
+  }
+  @UseGuards(JwtAuthGuard)
+  @Get('coach/:id')
+  async getCoachById(@Param('id') id: string) {
+    return this.usersService.findCoachById(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.STUDENT)
+  @Post('select-coach')
+  async selectCoach(@Request() req, @Body('coachId') coachId: string) {
+    return this.usersService.selectCoach(req.user._id, coachId);
   }
 }

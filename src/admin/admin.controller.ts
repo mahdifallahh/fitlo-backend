@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { PremiumStatusEnum, User } from '../users/schemas/user.schema';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -8,8 +8,7 @@ import { UserRole } from '../users/schemas/user.schema';
 import { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 
-
-@Controller('api/admin')
+@Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class AdminController {
@@ -19,9 +18,12 @@ export class AdminController {
   ) {}
 
   @Get('coaches')
-  async getAllCoaches() {
-  const coaches=await this.adminService.getAllCoaches();
-    return coaches;
+  async getAllCoaches(
+    @Query('search') search?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+  ) {
+    return this.adminService.getAllCoaches(search, page, limit);
   }
 
   @Get('premium-requests')

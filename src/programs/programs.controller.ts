@@ -33,6 +33,17 @@ export class ProgramsController {
   async getMyPrograms(@Req() req: RequestWithUser,@Query() ListQuery: ListQuery) {
     return this.programsService.getProgramsByCoach(req.user.userId,ListQuery);
   }
+  @Get('student/:studentId')
+  async getProgramsByStudentId(
+    @Req() req: RequestWithUser,
+    @Param('studentId') studentId: string,
+    @Query() listQuery: ListQuery,
+  ) {
+    return this.programsService.getProgramsByStudentId(req.user.userId, {
+      ...listQuery,
+      filters: { ...listQuery.filters, studentId },
+    });
+  }
 
   @Get(':id')
   async getOne(@Req() req: RequestWithUser, @Param('id') id: string) {
@@ -50,4 +61,5 @@ export class ProgramsController {
   async delete(@Req() req: RequestWithUser, @Param('id') id: string) {
     return this.programsService.delete(id, req.user.userId);
   }
+  
 }

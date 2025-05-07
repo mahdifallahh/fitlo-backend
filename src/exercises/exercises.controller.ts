@@ -12,6 +12,7 @@ import {
   UploadedFile,
   BadRequestException,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ExercisesService } from './exercises.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -22,11 +23,15 @@ import { extname } from 'path';
 import { ObjectId } from 'mongodb';
 import { v4 as uuid } from 'uuid';
 import { ListQuery } from 'src/common/dto/list-query.dto';
+import { UsersService } from '../users/users.service';
 
 @UseGuards(JwtAuthGuard)
 @Controller('exercises')
 export class ExercisesController {
-  constructor(private readonly exercisesService: ExercisesService) {}
+  constructor(
+    private readonly exercisesService: ExercisesService,
+    private readonly usersService: UsersService,
+  ) {}
 
   @Get()
   async getAll(
@@ -66,6 +71,14 @@ export class ExercisesController {
   ) {
     if (!body.name?.trim()) {
       throw new BadRequestException('نام تمرین الزامی است');
+    }
+
+    // Check if user is premium before allowing GIF upload
+    if (file) {
+      const user = await this.usersService.findById(req.user.userId);
+      if (!user?.isPremium) {
+        throw new ForbiddenException('آپلود گیف فقط برای کاربران پرمیوم در دسترس است');
+      }
     }
 
     const gifUrl = file
@@ -114,7 +127,16 @@ export class ExercisesController {
       },
     }),
   )
-  async uploadGif(@UploadedFile() file: Express.Multer.File) {
+  async uploadGif(
+    @Req() req: RequestWithUser,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    // Check if user is premium before allowing GIF upload
+    const user = await this.usersService.findById(req.user.userId);
+    if (!user?.isPremium) {
+      throw new ForbiddenException('آپلود گیف فقط برای کاربران پرمیوم در دسترس است');
+    }
+
     const url = `http://localhost:3000/uploads/gifs/${file.filename}`;
     return { url };
   }

@@ -71,6 +71,16 @@ export class ProgramsService {
     await program.save();
     return program;
   }
+  async getProgramsByStudentId(studentId: string, listQuery: ListQuery) {
+    return paginateQuery(this.programModel, listQuery, {
+      studentId,
+      populate: {
+        path: 'coachId',
+        select: 'name phone',
+      },
+      searchFields: ['coachId.name', 'coachId.phone'],
+    });
+  }
 
   async getProgramsByCoach(coachId: string, listQuery: ListQuery) {
     return paginateQuery(this.programModel, listQuery, {
