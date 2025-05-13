@@ -24,7 +24,7 @@ export class AuthService {
 
     this.otpStore.set(phone, { code, expiresAt });
 
-    // به‌جای SMS فعلاً لاگ بگیریم
+    // به‌جای SMS
     console.log(`📱 OTP برای ${phone}: ${code}`);
   }
   async verifyOtpAndRegister(
@@ -53,7 +53,7 @@ export class AuthService {
         phone,
         password: hashedPassword,
         verified: true,
-        role: UserRole.COACH, // پیش‌فرض
+        role: UserRole.COACH, 
       });
     } else if (!user.verified) {
       user.verified = true;
@@ -84,13 +84,13 @@ export class AuthService {
       throw new UnauthorizedException('کد وارد شده اشتباه است');
     }
 
-    // OTP درست است → ادامه دهیم
+   
     this.otpStore.delete(phone);
 
     let user = await this.usersService.findByPhone(phone);
 
     if (!user) {
-      const password = await bcrypt.hash(this.generateOtp(), 10); // رمز پیش‌فرض
+      const password = await bcrypt.hash(this.generateOtp(), 10); 
       user = await this.usersService.create({
         phone,
         password,

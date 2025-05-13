@@ -18,12 +18,12 @@ export class ExercisesService {
   async findAllByCoach(coachId: string, listQuery: ListQuery) {
     const filters = {
       coachId,
-      ...(listQuery.filters || {}), // Include categoryId from filters
+      ...(listQuery.filters || {}), 
     };
     return paginateQuery(this.exerciseModel, listQuery, {
       filters,
       searchFields: ['name'],
-      populate: 'categoryId', // Populate categoryId to get category details
+      populate: 'categoryId', 
     });
   }
 

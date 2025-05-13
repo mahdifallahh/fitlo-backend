@@ -25,7 +25,6 @@ export async function paginateQuery<T>(
   if (opts.studentId) where.studentId = opts.studentId;
   if (opts.role) where.role = opts.role;
 
-  // فیلترهای دلخواه
   if (opts.filters) {
     for (const key in opts.filters) {
       if (opts.filters[key]) {

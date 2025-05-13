@@ -98,7 +98,8 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
-    const url = `http://localhost:3000/uploads/profiles/${file.filename}`;
+    const baseUrl = process.env.BASE_URL;
+    const url = `${baseUrl}/uploads/profiles/${file.filename}`;
     return this.usersService.updateProfile(req.user.userId, {
       profileImage: url,
     });
@@ -221,17 +222,15 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
-    const url = `http://localhost:3000/uploads/receipts/${file.filename}`;
-    
-    // Get current user to check status
+    const baseUrl = process.env.BASE_URL;
+    const url = `${baseUrl}/uploads/receipts/${file.filename}`;
+ 
     const user = await this.usersService.findById(req.user.userId);
     
-    // If user is already premium, don't allow new receipt
     if (user?.premiumStatus === PremiumStatusEnum.ACCEPTED) {
       throw new BadRequestException('شما قبلاً کاربر پرمیوم هستید');
     }
 
-    // Update receipt and set status to pending
     return this.usersService.updateForReceipt(req.user.userId, {
       receiptUrl: url,
       premiumStatus: PremiumStatusEnum.PENDING,

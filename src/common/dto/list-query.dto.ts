@@ -36,7 +36,7 @@ export class ListQuery {
     /** مرتب‌سازی مثل:  -createdAt  یا  name  */
     sort?: string;
   
-    /** اگر '?raw=true' بدهیم صفحه‌بندی خام برمی‌گردد (به درد دراپ‌دان‌ها) */
+    
     raw?: 'true' | 'false';
     filters?: Record<string, any>;
   }

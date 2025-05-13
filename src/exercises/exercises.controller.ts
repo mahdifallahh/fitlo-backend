@@ -80,9 +80,9 @@ export class ExercisesController {
         throw new ForbiddenException('آپلود گیف فقط برای کاربران پرمیوم در دسترس است');
       }
     }
-
+    const baseUrl = process.env.BASE_URL;
     const gifUrl = file
-      ? `http://localhost:3000/uploads/gifs/${file.filename}`
+      ? `${baseUrl}/uploads/gifs/${file.filename}`
       : undefined;
 
     return this.exercisesService.create({
@@ -136,8 +136,8 @@ export class ExercisesController {
     if (!user?.isPremium) {
       throw new ForbiddenException('آپلود گیف فقط برای کاربران پرمیوم در دسترس است');
     }
-
-    const url = `http://localhost:3000/uploads/gifs/${file.filename}`;
+    const baseUrl = process.env.BASE_URL;
+    const url = `${baseUrl}/uploads/gifs/${file.filename}`;
     return { url };
   }
 }
