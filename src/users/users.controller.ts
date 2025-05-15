@@ -1,34 +1,58 @@
+import * as dotenv from 'dotenv';
+dotenv.config();
+
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import {
-  Controller,
-  Get,
-  Put,
+  BadRequestException,
   Body,
-  UseGuards,
-  Req,
+  Controller,
+  Delete,
+  Get,
   Param,
   Post,
-  Delete,
-  UploadedFile,
-  UseInterceptors,
-  BadRequestException,
+  Put,
   Query,
+  Req,
   Request,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
-import { UsersService } from './users.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import * as bcrypt from 'bcrypt';
+import { extname } from 'path';
+import { ListQuery } from 'src/common/dto/list-query.dto';
+import { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
+import { v4 as uuid } from 'uuid';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
-import * as bcrypt from 'bcrypt';
-import { PremiumStatusEnum, UserRole } from './schemas/user.schema';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
-import { v4 as uuid } from 'uuid';
-import { ListQuery } from 'src/common/dto/list-query.dto';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
+import { PremiumStatusEnum, UserRole } from './schemas/user.schema';
+import { UsersService } from './users.service';
+
+if (!process.env.MINIO_ACCESS_KEY || !process.env.MINIO_SECRET_KEY) {
+  throw new Error('MINIO_ACCESS_KEY and MINIO_SECRET_KEY must be defined');
+}
+
+const s3 = new S3Client({
+  endpoint: process.env.MINIO_ENDPOINT,
+  region: process.env.MINIO_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.MINIO_ACCESS_KEY,
+    secretAccessKey: process.env.MINIO_SECRET_KEY,
+  },
+  forcePathStyle: true,
+});
 
 @ApiTags('Users')
 @Controller('users')
@@ -69,18 +93,15 @@ export class UsersController {
       },
     },
   })
-  @ApiResponse({ status: 200, description: 'Profile image uploaded successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile image uploaded successfully',
+  })
   @UseGuards(JwtAuthGuard)
-  @Put('upload-profile')
+  @Post('upload-profile')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/profiles',
-        filename: (req, file, cb) => {
-          const uniqueName = `${uuid()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
+      storage: undefined,
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         const allowed = ['image/jpeg', 'image/png'];
@@ -98,8 +119,17 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
-    const baseUrl = process.env.BASE_URL;
-    const url = `${baseUrl}/uploads/profiles/${file.filename}`;
+    const key = `profiles/${uuid()}${extname(file.originalname)}`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.MINIO_BUCKET,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+    const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
+
     return this.usersService.updateProfile(req.user.userId, {
       profileImage: url,
     });
@@ -127,7 +157,9 @@ export class UsersController {
     @Req() req: RequestWithUser,
     @Body() createStudentDto: CreateStudentDto,
   ) {
-    const existingRole = await this.usersService.getRoleByPhone(createStudentDto.phone);
+    const existingRole = await this.usersService.getRoleByPhone(
+      createStudentDto.phone,
+    );
 
     if (existingRole) {
       throw new BadRequestException(
@@ -151,7 +183,10 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Returns list of students' })
   @UseGuards(JwtAuthGuard)
   @Get('students')
-  async getMyStudents(@Req() req: RequestWithUser, @Query() listQuery: ListQuery) {
+  async getMyStudents(
+    @Req() req: RequestWithUser,
+    @Query() listQuery: ListQuery,
+  ) {
     return this.usersService.findStudentsByCoach(req.user.userId, listQuery);
   }
 
@@ -166,7 +201,11 @@ export class UsersController {
     @Param('id') id: string,
     @Body() updateStudentDto: UpdateStudentDto,
   ) {
-    return this.usersService.updateStudent(id, req.user.userId, updateStudentDto);
+    return this.usersService.updateStudent(
+      id,
+      req.user.userId,
+      updateStudentDto,
+    );
   }
 
   @ApiOperation({ summary: 'Delete a student' })
@@ -193,18 +232,15 @@ export class UsersController {
       },
     },
   })
-  @ApiResponse({ status: 200, description: 'Premium request submitted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Premium request submitted successfully',
+  })
   @UseGuards(JwtAuthGuard)
   @Post('request-premium')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/receipts',
-        filename: (req, file, cb) => {
-          const uniqueName = `${uuid()}${extname(file.originalname)}`;
-          cb(null, uniqueName);
-        },
-      }),
+      storage: undefined,
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -222,11 +258,18 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
-    const baseUrl = process.env.BASE_URL;
-    const url = `${baseUrl}/uploads/receipts/${file.filename}`;
- 
+    const key = `receipts/${uuid()}${extname(file.originalname)}`;
+    await s3.send(
+      new PutObjectCommand({
+        Bucket: process.env.MINIO_BUCKET,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+    const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
+
     const user = await this.usersService.findById(req.user.userId);
-    
     if (user?.premiumStatus === PremiumStatusEnum.ACCEPTED) {
       throw new BadRequestException('شما قبلاً کاربر پرمیوم هستید');
     }

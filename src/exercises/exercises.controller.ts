@@ -24,6 +24,17 @@ import { ObjectId } from 'mongodb';
 import { v4 as uuid } from 'uuid';
 import { ListQuery } from 'src/common/dto/list-query.dto';
 import { UsersService } from '../users/users.service';
+import * as AWS from '@aws-sdk/client-s3';
+
+const s3 = new AWS.S3({
+  endpoint: process.env.MINIO_ENDPOINT || '',
+  region: process.env.MINIO_REGION || '',
+  credentials: {
+    accessKeyId: process.env.MINIO_ACCESS_KEY || '',
+    secretAccessKey: process.env.MINIO_SECRET_KEY || '',
+  },
+  forcePathStyle: true, // Required for MinIO
+});
 
 @UseGuards(JwtAuthGuard)
 @Controller('exercises')
@@ -48,13 +59,15 @@ export class ExercisesController {
   @Post()
   @UseInterceptors(
     FileInterceptor('gif', {
-      storage: diskStorage({
-        destination: './uploads/gifs',
-        filename: (req, file, cb) => {
-          const unique = uuid() + extname(file.originalname);
-          cb(null, unique);
-        },
-      }),
+      storage: process.env.NODE_ENV === 'production'
+        ? undefined // Let the method handle MinIO upload
+        : diskStorage({
+            destination: './uploads/gifs',
+            filename: (req, file, cb) => {
+              const unique = uuid() + extname(file.originalname);
+              cb(null, unique);
+            },
+          }),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         if (file.mimetype !== 'image/gif') {
@@ -73,17 +86,30 @@ export class ExercisesController {
       throw new BadRequestException('نام تمرین الزامی است');
     }
 
-    // Check if user is premium before allowing GIF upload
     if (file) {
       const user = await this.usersService.findById(req.user.userId);
       if (!user?.isPremium) {
-        throw new ForbiddenException('آپلود گیف فقط برای کاربران پرمیوم در دسترس است');
+        throw new ForbiddenException(
+          'آپلود گیف فقط برای کاربران پرمیوم در دسترس است',
+        );
       }
     }
-    const baseUrl = process.env.BASE_URL;
-    const gifUrl = file
-      ? `${baseUrl}/uploads/gifs/${file.filename}`
-      : undefined;
+
+    let gifUrl: string | undefined;
+    if (process.env.NODE_ENV === 'production' && file) {
+      const key = `gifs/${uuid()}${extname(file.originalname)}`;
+      await s3.putObject({
+        Bucket: process.env.MINIO_BUCKET,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+        ACL: 'public-read', // Set public access
+      });
+      gifUrl = `${process.env.MINIO_PUBLIC_URL}/${key}`;
+    } else if (file) {
+      const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+      gifUrl = `${baseUrl}/uploads/gifs/${file.filename}`;
+    }
 
     return this.exercisesService.create({
       name: body.name,
@@ -111,13 +137,7 @@ export class ExercisesController {
   @Post('upload-gif')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: diskStorage({
-        destination: './uploads/gifs',
-        filename: (req, file, cb) => {
-          const unique = uuid() + extname(file.originalname);
-          cb(null, unique);
-        },
-      }),
+      storage: undefined, // Always use MinIO
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         if (file.mimetype !== 'image/gif') {
@@ -131,13 +151,23 @@ export class ExercisesController {
     @Req() req: RequestWithUser,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    // Check if user is premium before allowing GIF upload
     const user = await this.usersService.findById(req.user.userId);
     if (!user?.isPremium) {
-      throw new ForbiddenException('آپلود گیف فقط برای کاربران پرمیوم در دسترس است');
+      throw new ForbiddenException(
+        'آپلود گیف فقط برای کاربران پرمیوم در دسترس است',
+      );
     }
-    const baseUrl = process.env.BASE_URL;
-    const url = `${baseUrl}/uploads/gifs/${file.filename}`;
+
+    const key = `gifs/${uuid()}${extname(file.originalname)}`;
+    await s3.putObject({
+      Bucket: process.env.MINIO_BUCKET,
+      Key: key,
+      Body: file.buffer,
+      ContentType: file.mimetype,
+      ACL: 'public-read', // Set public access
+    });
+    const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
+
     return { url };
   }
 }
