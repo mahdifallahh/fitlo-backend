@@ -11,6 +11,8 @@ export class Exercise {
 
   @Prop()
   gifUrl?: string;
+  @Prop()
+  signedGifUrl?: string;
 
   @Prop()
   videoLink?: string;

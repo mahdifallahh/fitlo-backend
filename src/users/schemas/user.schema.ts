@@ -53,6 +53,8 @@ export class User {
   coachId?: string;
   @Prop()
   receiptUrl?: string;
+  @Prop()
+  signedProfilePictureUrl?: string;
 
   @Prop({ enum: PremiumStatusEnum, default: null })
   premiumStatus?: PremiumStatusEnum;
@@ -64,7 +66,8 @@ export class User {
   premiumExpiresAt?: Date;
 
   @Prop()
-  profileImage?: string;
+  minioKeyUrl?: string;
+
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

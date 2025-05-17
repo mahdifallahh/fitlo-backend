@@ -4,6 +4,7 @@ import { User, UserDocument, UserRole } from './schemas/user.schema';
 import { Model } from 'mongoose';
 import { ListQuery } from 'src/common/dto/list-query.dto';
 import { paginateQuery } from 'src/common/utils/paginate-query';
+import { generateSignedUrl } from '../common/utils/minio-utils';
 
 @Injectable()
 export class UsersService {
@@ -41,7 +42,12 @@ export class UsersService {
     return this.userModel.findByIdAndUpdate(userId, data, { new: true });
   }
   async findById(userId: string) {
-    return this.userModel.findById(userId).select('-password'); // رمز عبور مخفی
+    const user = await this.userModel.findById(userId);
+    if (user?.minioKeyUrl) {
+    
+      user.signedProfilePictureUrl = await generateSignedUrl(user.minioKeyUrl);
+    }
+    return user;
   }
 
   async updateProfile(userId: string, profileData: Partial<User>) {

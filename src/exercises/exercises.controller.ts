@@ -25,6 +25,7 @@ import { v4 as uuid } from 'uuid';
 import { ListQuery } from 'src/common/dto/list-query.dto';
 import { UsersService } from '../users/users.service';
 import * as AWS from '@aws-sdk/client-s3';
+import { generateSignedUrl } from 'src/common/utils/minio-utils';
 
 const s3 = new AWS.S3({
   endpoint: process.env.MINIO_ENDPOINT || '',
@@ -59,15 +60,7 @@ export class ExercisesController {
   @Post()
   @UseInterceptors(
     FileInterceptor('gif', {
-      storage: process.env.NODE_ENV === 'production'
-        ? undefined // Let the method handle MinIO upload
-        : diskStorage({
-            destination: './uploads/gifs',
-            filename: (req, file, cb) => {
-              const unique = uuid() + extname(file.originalname);
-              cb(null, unique);
-            },
-          }),
+      storage: undefined, // Always use MinIO
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         if (file.mimetype !== 'image/gif') {
@@ -95,27 +88,24 @@ export class ExercisesController {
       }
     }
 
-    let gifUrl: string | undefined;
-    if (process.env.NODE_ENV === 'production' && file) {
-      const key = `gifs/${uuid()}${extname(file.originalname)}`;
-      await s3.putObject({
-        Bucket: process.env.MINIO_BUCKET,
-        Key: key,
-        Body: file.buffer,
-        ContentType: file.mimetype,
-        ACL: 'public-read', // Set public access
-      });
-      gifUrl = `${process.env.MINIO_PUBLIC_URL}/${key}`;
-    } else if (file) {
-      const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-      gifUrl = `${baseUrl}/uploads/gifs/${file.filename}`;
-    }
-
-    return this.exercisesService.create({
+    const exerciseData = {
       name: body.name,
       categoryId: body.categoryId || undefined,
       videoLink: body.videoLink || undefined,
-      gifUrl,
+    };
+
+    // CHANGE: Use uploadExerciseGif for GIF uploads to ensure signed URL is generated consistently
+    if (file) {
+      return this.exercisesService.uploadExerciseGif(
+        file,
+        req.user.userId,
+        exerciseData,
+      );
+    }
+
+    // CHANGE: Ensure create returns exercise with signedGifUrl (handled by ExercisesService)
+    return this.exercisesService.create({
+      ...exerciseData,
       coachId: new ObjectId(req.user.userId),
     });
   }
@@ -126,6 +116,7 @@ export class ExercisesController {
     @Param('id') id: string,
     @Body() body: any,
   ) {
+    // CHANGE: No change needed; update now returns signedGifUrl via ExercisesService
     return this.exercisesService.update(id, req.user.userId, body);
   }
 
@@ -159,15 +150,16 @@ export class ExercisesController {
     }
 
     const key = `gifs/${uuid()}${extname(file.originalname)}`;
-    await s3.putObject({
-      Bucket: process.env.MINIO_BUCKET,
-      Key: key,
-      Body: file.buffer,
-      ContentType: file.mimetype,
-      ACL: 'public-read', // Set public access
-    });
-    const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
-
-    return { url };
+    await s3.send(
+      new AWS.PutObjectCommand({
+        Bucket: process.env.MINIO_BUCKET,
+        Key: key,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      }),
+    );
+    // CHANGE: Return signed URL instead of public URL for secure access
+    const signedUrl = await generateSignedUrl(key);
+    return { url: signedUrl };
   }
 }

@@ -1,7 +1,7 @@
-import * as dotenv from 'dotenv';
-dotenv.config();
+
 
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import * as dotenv from 'dotenv';
 import {
   BadRequestException,
   Body,
@@ -39,20 +39,25 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { PremiumStatusEnum, UserRole } from './schemas/user.schema';
 import { UsersService } from './users.service';
+import { generateSignedUrl } from 'src/common/utils/minio-utils';
+import { join } from 'path';
+dotenv.config({ path: 'D:/myProjects/fitlo.ir/fitlo-backend/.env' });
+
+const s3Config = {
+  endpoint: process.env.MINIO_ENDPOINT,
+  region: process.env.MINIO_REGION || 'us-east-1',
+  credentials: {
+    accessKeyId: process.env.MINIO_ACCESS_KEY!,
+    secretAccessKey: process.env.MINIO_SECRET_KEY!,
+  },
+  forcePathStyle: true,
+};
 
 if (!process.env.MINIO_ACCESS_KEY || !process.env.MINIO_SECRET_KEY) {
   throw new Error('MINIO_ACCESS_KEY and MINIO_SECRET_KEY must be defined');
 }
 
-const s3 = new S3Client({
-  endpoint: process.env.MINIO_ENDPOINT,
-  region: process.env.MINIO_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.MINIO_ACCESS_KEY,
-    secretAccessKey: process.env.MINIO_SECRET_KEY,
-  },
-  forcePathStyle: true,
-});
+const s3 = new S3Client(s3Config);
 
 @ApiTags('Users')
 @Controller('users')
@@ -119,6 +124,8 @@ export class UsersController {
     @UploadedFile() file: Express.Multer.File,
     @Req() req: RequestWithUser,
   ) {
+ 
+    
     const key = `profiles/${uuid()}${extname(file.originalname)}`;
     await s3.send(
       new PutObjectCommand({
@@ -130,9 +137,17 @@ export class UsersController {
     );
     const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
 
-    return this.usersService.updateProfile(req.user.userId, {
-      profileImage: url,
+    const updatedUser = await this.usersService.updateProfile(req.user.userId, {
+      minioKeyUrl: key,
     });
+
+    const signedUrl = await generateSignedUrl(key);
+
+    return {
+      message: 'Profile image uploaded successfully',
+      minioKeyUrl: key,
+      signedProfilePictureUrl: signedUrl,
+    };
   }
 
   @ApiOperation({ summary: 'Get public profile by phone number' })
