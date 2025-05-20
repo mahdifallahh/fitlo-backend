@@ -73,7 +73,7 @@ export class ExercisesService {
   }
 
   async uploadExerciseGif(
-    file: Express.Multer.File,
+    file: any,
     coachId: string,
     exerciseData: any,
   ) {

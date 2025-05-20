@@ -40,6 +40,7 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { PremiumStatusEnum, UserRole } from './schemas/user.schema';
 import { UsersService } from './users.service';
 import { generateSignedUrl } from 'src/common/utils/minio-utils';
+import { Multer } from 'multer';
 import { join } from 'path';
 dotenv.config({ path: 'D:/myProjects/fitlo.ir/fitlo-backend/.env' });
 
@@ -121,7 +122,7 @@ export class UsersController {
     }),
   )
   async uploadProfileImage(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Req() req: RequestWithUser,
   ) {
  
@@ -270,7 +271,7 @@ export class UsersController {
     }),
   )
   async uploadPremiumReceipt(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Req() req: RequestWithUser,
   ) {
     const key = `receipts/${uuid()}${extname(file.originalname)}`;

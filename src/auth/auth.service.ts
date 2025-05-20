@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcryptjs';
 import { UserRole } from 'src/users/schemas/user.schema';
+import axios from 'axios';
 
 @Injectable()
 export class AuthService {
@@ -18,15 +19,46 @@ export class AuthService {
     return Math.floor(10000 + Math.random() * 90000).toString();
   }
 
+  // async sendOtp(phone: string): Promise<void> {
+  //   const code = this.generateOtp();
+  //   const expiresAt = Date.now() + 60_000; // 60 ثانیه اعتبار
+
+  //   this.otpStore.set(phone, { code, expiresAt });
+
+  //   // به‌جای SMS
+  //   console.log(`📱 OTP برای ${phone}: ${code}`);
+  // }
   async sendOtp(phone: string): Promise<void> {
-    const code = this.generateOtp();
-    const expiresAt = Date.now() + 60_000; // 60 ثانیه اعتبار
+    try {
+      const response = await axios.post(
+        'https://console.melipayamak.com/api/send/otp/03516d01c8b9472d86c9501b3398c528',
 
-    this.otpStore.set(phone, { code, expiresAt });
-
-    // به‌جای SMS
-    console.log(`📱 OTP برای ${phone}: ${code}`);
+        { to: phone },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+  
+      const receivedCode = response.data?.code;
+      if (!receivedCode) {
+        throw new Error(response.data?.status || 'ارسال پیامک ناموفق بود');
+      }
+  
+      // ذخیره کد ملی‌پیامک در حافظه موقت
+      const expiresAt = Date.now() + 60_000;
+      this.otpStore.set(phone, { code: receivedCode, expiresAt });
+  
+    } catch (error) {
+      console.error('OTP error:', {
+        message: error.message,
+        responseData: error.response?.data,
+        status: error.response?.status,
+      });      throw new InternalServerErrorException('خطا در ارسال کد تایید');
+    }
   }
+  
   async verifyOtpAndRegister(
     phone: string,
     code: string,

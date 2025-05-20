@@ -72,7 +72,7 @@ export class ExercisesController {
   )
   async create(
     @Req() req: RequestWithUser,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body() body: any,
   ) {
     if (!body.name?.trim()) {
@@ -140,7 +140,7 @@ export class ExercisesController {
   )
   async uploadGif(
     @Req() req: RequestWithUser,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
   ) {
     const user = await this.usersService.findById(req.user.userId);
     if (!user?.isPremium) {
