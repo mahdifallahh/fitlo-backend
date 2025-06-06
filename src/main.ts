@@ -6,18 +6,13 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 dotenv.config({ path: 'D:/myProjects/fitlo.ir/fitlo-backend/.env' });
-console.log('Loaded Environment Variables:', {
-  NODE_ENV: process.env.NODE_ENV,
-  MINIO_ACCESS_KEY: process.env.MINIO_ACCESS_KEY ? 'defined' : 'undefined',
-  MINIO_SECRET_KEY: process.env.MINIO_SECRET_KEY ? 'defined' : 'undefined',
-  MINIO_BUCKET: process.env.MINIO_BUCKET,
-});
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
  
   // Enable CORS
   app.enableCors({
-    origin: true, // Allow all origins in development
+    origin: ['http://fitlo.ir', 'https://fitlo.ir'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
