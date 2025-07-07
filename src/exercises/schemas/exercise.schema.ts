@@ -19,6 +19,7 @@ export class Exercise {
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Category' })
   categoryId?: Types.ObjectId | Category;
+  
 
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true })
   coachId: Types.ObjectId | User;

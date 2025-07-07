@@ -29,6 +29,7 @@ export class ProgramsService {
                 : '',
             sets: ex.sets,
             reps: ex.reps,
+            description: ex.description,
           })),
         };
       }),

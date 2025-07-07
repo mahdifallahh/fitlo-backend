@@ -26,6 +26,8 @@ import { ListQuery } from 'src/common/dto/list-query.dto';
 import { UsersService } from '../users/users.service';
 import * as AWS from '@aws-sdk/client-s3';
 import { generateSignedUrl } from 'src/common/utils/minio-utils';
+import { GetUser } from '../auth/decorators/get-user.decorator';
+import { ShareExercisesDto, ValidateSharePasswordDto } from './dto/share-exercises.dto';
 
 const s3 = new AWS.S3({
   endpoint: process.env.MINIO_ENDPOINT || '',
@@ -161,5 +163,44 @@ export class ExercisesController {
     // CHANGE: Return signed URL instead of public URL for secure access
     const signedUrl = await generateSignedUrl(key);
     return { url: signedUrl };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('share')
+  async createShareLink(
+    @GetUser() user: any,
+    @Body() shareExercisesDto: ShareExercisesDto,
+  ) {
+    return this.exercisesService.createShareLink(
+      user._id,
+      shareExercisesDto.password,
+    );
+  }
+
+  @Post('share/:shareId/validate')
+  async validateSharePassword(
+    @Param('shareId') shareId: string,
+    @Body() validateSharePasswordDto: ValidateSharePasswordDto,
+  ) {
+    return this.exercisesService.validateSharePassword(
+      shareId,
+      validateSharePasswordDto.password,
+    );
+  }
+
+  @Get('shared-exercises/:shareId')
+  async getSharedExercises(
+    @Param('shareId') shareId: string,
+    @Query('search') search?: string,
+  ) {
+    return this.exercisesService.getSharedExercises(shareId, search);
+  }
+
+  @Put('shared-exercises/toggle-share')
+  async toggleShareForAll(
+    @GetUser() user: any,
+    @Body('isShareForAll') isShareForAll: boolean,
+  ) {
+    return this.exercisesService.toggleShareForAll(user._id, isShareForAll);
   }
 }

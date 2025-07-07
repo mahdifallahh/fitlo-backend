@@ -14,6 +14,7 @@ import { ProgramsService } from './programs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 import { ListQuery } from 'src/common/dto/list-query.dto';
+import { CreateProgramDto } from './dto/create-program.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('programs')
@@ -21,7 +22,7 @@ export class ProgramsController {
   constructor(private readonly programsService: ProgramsService) {}
 
   @Post()
-  async createProgram(@Req() req: RequestWithUser, @Body() body: any) {
+  async createProgram(@Req() req: RequestWithUser, @Body() body: CreateProgramDto) {
     return this.programsService.createProgram({
       coachId: req.user.userId,
       studentId: body.studentId,

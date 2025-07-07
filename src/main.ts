@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+dotenv.config();
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -12,7 +13,7 @@ async function bootstrap() {
  
   // Enable CORS
   app.enableCors({
-    origin: ['http://fitlo.ir', 'https://fitlo.ir'],
+    origin: ['http://fitlo.ir', 'https://fitlo.ir','http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

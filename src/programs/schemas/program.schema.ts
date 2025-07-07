@@ -24,6 +24,7 @@ export class Program {
           categoryName: String,
           sets: String,
           reps: String,
+          description: String,
         },
       ],
     },
@@ -36,6 +37,9 @@ export class Program {
       gifUrl?: string;
       videoLink?: string;
       categoryName?: string;
+      sets?: string;
+      reps?: string;
+      description?: string;
     }[];
   }[];
 }

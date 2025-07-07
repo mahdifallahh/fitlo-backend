@@ -17,5 +17,5 @@ export async function generateSignedUrl(key: string): Promise<string> {
     Key: key,
     
   });
-  return getSignedUrl(s3, command, { expiresIn: 3600 }); // URL معتبر برای 1 ساعت
+  return getSignedUrl(s3, command, { expiresIn: 3600 });
 }

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Exercise, ExerciseDocument } from './schemas/exercise.schema';
 import { HydratedDocument, Model } from 'mongoose';
@@ -9,11 +9,15 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from 'src/common/utils/s3-client';
 import { v4 as uuid } from 'uuid';
 import { extname } from 'path';
+import { SharedExercises } from './schemas/shared-exercises.schema';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 @Injectable()
 export class ExercisesService {
   constructor(
     @InjectModel(Exercise.name) private exerciseModel: Model<ExerciseDocument>,
+    @InjectModel(SharedExercises.name) private readonly sharedExercisesModel: Model<SharedExercises>,
   ) {}
 
   private async addSignedUrlToExercise(exercise: ExerciseDocument | null) {
@@ -38,7 +42,6 @@ export class ExercisesService {
     const exercise = await this.exerciseModel.create(data);
     return this.addSignedUrlToExercise(exercise);
   }
-
 
   async findAllByCoach(coachId: string, listQuery: ListQuery) {
     const filters = {
@@ -98,5 +101,94 @@ export class ExercisesService {
     });
 
     return this.addSignedUrlToExercise(exercise);
+  }
+
+  async createShareLink(coachId: string, password: string, isShareForAll: boolean = false) {
+    // بررسی وجود رکورد با coachId
+    const existingLink = await this.sharedExercisesModel.findOne({ coachId }) as SharedExercises;
+
+    // هش کردن رمز عبور
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    if (existingLink) {
+      // به‌روزرسانی رکورد موجود
+      existingLink.password = hashedPassword;
+      existingLink.isActive = true;
+      existingLink.isShareForAll = isShareForAll;
+      existingLink.shareId = crypto.randomBytes(8).toString('hex');
+      await existingLink.save();
+
+      return {
+        shareId: existingLink.shareId,
+        shareUrl: `${process.env.BASE_URL}/shared-exercises/${existingLink.shareId}`,
+      };
+    }
+
+    // ایجاد رکورد جدید
+    const shareId = crypto.randomBytes(8).toString('hex');
+    const sharedExercises = await this.sharedExercisesModel.create({
+      coachId,
+      password: hashedPassword,
+      shareId,
+      isActive: true,
+      isShareForAll,
+    });
+
+    return {
+      shareId: sharedExercises.shareId,
+      shareUrl: `${process.env.BASE_URL}/shared-exercises/${shareId}`,
+    };
+  }
+
+  async validateSharePassword(shareId: string, password: string) {
+    const sharedExercises = await this.sharedExercisesModel.findOne({
+      shareId,
+      isActive: true
+    });
+
+    if (!sharedExercises) {
+      throw new NotFoundException('لینک اشتراک‌گذاری یافت نشد یا منقضی شده است');
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, sharedExercises.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('رمز عبور نادرست است');
+    }
+
+    return true;
+  }
+
+  async getSharedExercises(shareId: string, search?: string) {
+    const sharedExercises = await this.sharedExercisesModel.findOne({
+      shareId,
+      isActive: true
+    });
+
+    if (!sharedExercises) {
+      throw new NotFoundException('لینک اشتراک‌گذاری یافت نشد یا منقضی شده است');
+    }
+
+    return this.exerciseModel.find({
+      coachId: sharedExercises.coachId,
+      isPublic: true
+    }).exec();
+  }
+
+  async deactivateShareLink(coachId: string, shareId: string) {
+    return this.sharedExercisesModel.findOneAndUpdate(
+      { shareId, coachId },
+      { isActive: false },
+      { new: true }
+    );
+  }
+
+  async toggleShareForAll(coachId: string, isShareForAll: boolean) {
+    const sharedExercise = await this.sharedExercisesModel.findOne({ coachId });
+    if (!sharedExercise) {
+      throw new Error('Shared exercise not found');
+    }
+    sharedExercise.isShareForAll = isShareForAll;
+    await sharedExercise.save();
+    return sharedExercise;
   }
 }
