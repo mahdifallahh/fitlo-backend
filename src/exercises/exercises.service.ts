@@ -9,7 +9,7 @@ import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { s3 } from 'src/common/utils/s3-client';
 import { v4 as uuid } from 'uuid';
 import { extname } from 'path';
-import { SharedExercises } from './schemas/shared-exercises.schema';
+import { SharedExercises } from '../users/schemas/shared-exercises.schema';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 
@@ -103,42 +103,7 @@ export class ExercisesService {
     return this.addSignedUrlToExercise(exercise);
   }
 
-  async createShareLink(coachId: string, password: string, isShareForAll: boolean = false) {
-    // بررسی وجود رکورد با coachId
-    const existingLink = await this.sharedExercisesModel.findOne({ coachId }) as SharedExercises;
-
-    // هش کردن رمز عبور
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    if (existingLink) {
-      // به‌روزرسانی رکورد موجود
-      existingLink.password = hashedPassword;
-      existingLink.isActive = true;
-      existingLink.isShareForAll = isShareForAll;
-      existingLink.shareId = crypto.randomBytes(8).toString('hex');
-      await existingLink.save();
-
-      return {
-        shareId: existingLink.shareId,
-        shareUrl: `${process.env.BASE_URL}/shared-exercises/${existingLink.shareId}`,
-      };
-    }
-
-    // ایجاد رکورد جدید
-    const shareId = crypto.randomBytes(8).toString('hex');
-    const sharedExercises = await this.sharedExercisesModel.create({
-      coachId,
-      password: hashedPassword,
-      shareId,
-      isActive: true,
-      isShareForAll,
-    });
-
-    return {
-      shareId: sharedExercises.shareId,
-      shareUrl: `${process.env.BASE_URL}/shared-exercises/${shareId}`,
-    };
-  }
+ 
 
   async validateSharePassword(shareId: string, password: string) {
     const sharedExercises = await this.sharedExercisesModel.findOne({

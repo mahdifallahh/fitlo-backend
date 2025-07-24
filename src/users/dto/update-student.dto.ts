@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class UpdateStudentDto {
   @ApiProperty({
@@ -19,4 +19,13 @@ export class UpdateStudentDto {
   @IsString()
   @IsOptional()
   password?: string;
-} 
+
+  @ApiProperty({
+    description: 'Whether to share coach exercises with this student',
+    example: true,
+    required: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  sharedExercises?: boolean;
+}

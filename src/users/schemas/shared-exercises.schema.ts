@@ -18,6 +18,9 @@ export class SharedExercises {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  @Prop({ default: false })
+  isShareForAll: boolean;
 }
 
 export const SharedExercisesSchema = SchemaFactory.createForClass(SharedExercises);

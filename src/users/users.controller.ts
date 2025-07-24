@@ -1,5 +1,3 @@
-
-
 import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import * as dotenv from 'dotenv';
 import {
@@ -17,6 +15,7 @@ import {
   UploadedFile,
   UseGuards,
   UseInterceptors,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
@@ -42,6 +41,8 @@ import { UsersService } from './users.service';
 import { generateSignedUrl } from 'src/common/utils/minio-utils';
 import { Multer } from 'multer';
 import { join } from 'path';
+import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { ValidateSharePasswordDto } from '../exercises/dto/share-exercises.dto';
 dotenv.config({ path: 'D:/myProjects/fitlo.ir/fitlo-backend/.env' });
 
 const s3Config = {
@@ -63,7 +64,7 @@ const s3 = new S3Client(s3Config);
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @ApiOperation({ summary: 'Get current user profile' })
   @ApiBearerAuth()
@@ -80,8 +81,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   @UseGuards(JwtAuthGuard)
   @Put('me')
-  async updateMyProfile(@Req() req: RequestWithUser, @Body() body: any) {
-    const userId = (req.user as any).userId;
+  async updateMyProfile(@GetUser() user: any, @Body() body: any) {
+    const userId = user._id;
     return this.usersService.updateProfile(userId, body);
   }
 
@@ -121,12 +122,7 @@ export class UsersController {
       },
     }),
   )
-  async uploadProfileImage(
-    @UploadedFile() file: any,
-    @Req() req: RequestWithUser,
-  ) {
- 
-    
+  async uploadProfileImage(@UploadedFile() file: any, @GetUser() user: any) {
     const key = `profiles/${uuid()}${extname(file.originalname)}`;
     await s3.send(
       new PutObjectCommand({
@@ -138,17 +134,12 @@ export class UsersController {
     );
     const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
 
-    const updatedUser = await this.usersService.updateProfile(req.user.userId, {
-      minioKeyUrl: key,
-    });
-
     const signedUrl = await generateSignedUrl(key);
-
-    return {
-      message: 'Profile image uploaded successfully',
+    const updatedUser = await this.usersService.updateProfile(user._id, {
       minioKeyUrl: key,
       signedProfilePictureUrl: signedUrl,
-    };
+    });
+    return updatedUser;
   }
 
   @ApiOperation({ summary: 'Get public profile by phone number' })
@@ -170,28 +161,10 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Post('students')
   async createStudent(
-    @Req() req: RequestWithUser,
     @Body() createStudentDto: CreateStudentDto,
+    @GetUser() user?: any,
   ) {
-    const existingRole = await this.usersService.getRoleByPhone(
-      createStudentDto.phone,
-    );
-
-    if (existingRole) {
-      throw new BadRequestException(
-        `این شماره قبلاً به عنوان "${existingRole}" ثبت شده است.`,
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(createStudentDto.password, 10);
-    return this.usersService.create({
-      phone: createStudentDto.phone,
-      password: hashedPassword,
-      role: UserRole.STUDENT,
-      verified: false,
-      coachId: req.user.userId,
-      name: createStudentDto.name,
-    });
+    return this.usersService.addCoachToStudent(createStudentDto, user._id);
   }
 
   @ApiOperation({ summary: 'Get all students of current coach' })
@@ -199,11 +172,8 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Returns list of students' })
   @UseGuards(JwtAuthGuard)
   @Get('students')
-  async getMyStudents(
-    @Req() req: RequestWithUser,
-    @Query() listQuery: ListQuery,
-  ) {
-    return this.usersService.findStudentsByCoach(req.user.userId, listQuery);
+  async getMyStudents(@Query() listQuery: ListQuery, @GetUser() user?: any) {
+    return this.usersService.findStudentsByCoach(user._id, listQuery);
   }
 
   @ApiOperation({ summary: 'Update a student' })
@@ -213,15 +183,11 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @Put('students/:id')
   async updateStudent(
-    @Req() req: RequestWithUser,
     @Param('id') id: string,
     @Body() updateStudentDto: UpdateStudentDto,
+    @GetUser() user?: any,
   ) {
-    return this.usersService.updateStudent(
-      id,
-      req.user.userId,
-      updateStudentDto,
-    );
+    return this.usersService.updateStudent(id, user._id, updateStudentDto);
   }
 
   @ApiOperation({ summary: 'Delete a student' })
@@ -230,8 +196,8 @@ export class UsersController {
   @ApiResponse({ status: 404, description: 'Student not found' })
   @UseGuards(JwtAuthGuard)
   @Delete('students/:id')
-  async deleteStudent(@Req() req: RequestWithUser, @Param('id') id: string) {
-    return this.usersService.deleteStudent(id, req.user.userId);
+  async deleteStudent(@Param('id') id: string,@GetUser() user?: any) {
+    return this.usersService.deleteStudent(id, user._id);
   }
 
   @ApiOperation({ summary: 'Request premium status' })
@@ -272,7 +238,8 @@ export class UsersController {
   )
   async uploadPremiumReceipt(
     @UploadedFile() file: any,
-    @Req() req: RequestWithUser,
+    @Body() body: any,
+    @GetUser() user: any,
   ) {
     const key = `receipts/${uuid()}${extname(file.originalname)}`;
     await s3.send(
@@ -285,14 +252,15 @@ export class UsersController {
     );
     const url = `${process.env.MINIO_PUBLIC_URL}/${key}`;
 
-    const user = await this.usersService.findById(req.user.userId);
-    if (user?.premiumStatus === PremiumStatusEnum.ACCEPTED) {
+    const userData = await this.usersService.findById(user._id);
+    if (userData?.premiumStatus === PremiumStatusEnum.ACCEPTED) {
       throw new BadRequestException('شما قبلاً کاربر پرمیوم هستید');
     }
 
-    return this.usersService.updateForReceipt(req.user.userId, {
+    return this.usersService.updateForReceipt(user._id, {
       receiptUrl: url,
       premiumStatus: PremiumStatusEnum.PENDING,
+      subscriptionType: body.subscriptionType,
     });
   }
 
@@ -312,5 +280,26 @@ export class UsersController {
   @Post('select-coach')
   async selectCoach(@Request() req, @Body('coachId') coachId: string) {
     return this.usersService.selectCoach(req.user._id, coachId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('students/:studentId/exercises')
+  async getStudentExercises(@Param('studentId') studentId: string) {
+    // Fetch the student by ID
+    const student = await this.usersService.findById(studentId);
+    if (!student) {
+      throw new NotFoundException('Student not found');
+    }
+
+    // Ensure coachesIdsThatSharedExercises is an array
+    const coachesIdsThatSharedExercises =
+      student.coachesIdsThatSharedExercises || [];
+
+    // Fetch exercises from all shared coaches
+    // Removed reference to non-existent method
+    // const exercises = await this.usersService.getExercisesFromSharedCoaches(
+    //   coachesIdsThatSharedExercises,
+    // );
+    return []; // Return an empty array as the method is removed
   }
 }

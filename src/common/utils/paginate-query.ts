@@ -27,7 +27,7 @@ export async function paginateQuery<T>(
 
   if (opts.filters) {
     for (const key in opts.filters) {
-      if (opts.filters[key]) {
+      if (opts.filters[key] !== undefined) { 
         where[key] = opts.filters[key];
       }
     }

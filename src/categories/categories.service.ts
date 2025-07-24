@@ -12,6 +12,7 @@ export class CategoriesService {
   ) {}
 
   async create(data: Partial<Category>) {
+    data.type = 'exercise';
     return this.categoryModel.create(data);
   }
 
@@ -23,6 +24,7 @@ export class CategoriesService {
   }
 
   async update(id: string, coachId: string, data: Partial<Category>) {
+    data.type = 'exercise';
     return this.categoryModel.findOneAndUpdate({ _id: id, coachId }, data, {
       new: true,
     });

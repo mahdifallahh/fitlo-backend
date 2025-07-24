@@ -15,6 +15,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequestWithUser } from 'src/common/interfaces/request-with-user.interface';
 import { ListQuery } from 'src/common/dto/list-query.dto';
 import { CreateProgramDto } from './dto/create-program.dto';
+import { GetUser } from 'src/auth/decorators/get-user.decorator';
+import { ProgramResponseDto } from './dto/program-response.dto';
+import { UpdateProgramDto } from './dto/update-program.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('programs')
@@ -22,45 +25,46 @@ export class ProgramsController {
   constructor(private readonly programsService: ProgramsService) {}
 
   @Post()
-  async createProgram(@Req() req: RequestWithUser, @Body() body: CreateProgramDto) {
+  async createProgram(@Body() body: CreateProgramDto, @GetUser() user?: any) {
     return this.programsService.createProgram({
-      coachId: req.user.userId,
+      coachId: user._id,
       studentId: body.studentId,
       days: body.days,
     });
   }
 
   @Get()
-  async getMyPrograms(@Req() req: RequestWithUser,@Query() ListQuery: ListQuery) {
-    return this.programsService.getProgramsByCoach(req.user.userId,ListQuery);
+  async getMyPrograms(@Query() ListQuery: ListQuery,@GetUser() user?: any) {
+    return this.programsService.getProgramsByCoach(user._id,ListQuery);
   }
   @Get('student/:studentId')
   async getProgramsByStudentId(
-    @Req() req: RequestWithUser,
+   
     @Param('studentId') studentId: string,
     @Query() listQuery: ListQuery,
+    @GetUser() user?: any
   ) {
-    return this.programsService.getProgramsByStudentId(req.user.userId, {
+    return this.programsService.getProgramsByStudentId(user._id, {
       ...listQuery,
       filters: { ...listQuery.filters, studentId },
     });
   }
 
   @Get(':id')
-  async getOne(@Req() req: RequestWithUser, @Param('id') id: string) {
-    return this.programsService.getOneById(id, req.user.userId);
+  async getOne(@Param('id') id: string, @GetUser() user?: any): Promise<ProgramResponseDto> {
+    return this.programsService.getOneById(id, user._id);
   }
   @Put(':id')
   async updateProgram(
-    @Req() req: RequestWithUser,
     @Param('id') id: string,
-    @Body() body: any,
+    @Body() body: UpdateProgramDto,
+    @GetUser() user?: any
   ) {
-    return this.programsService.updateProgram(id, req.user.userId, body);
+    return this.programsService.updateProgram(id, user._id, body);
   }
   @Delete(':id')
-  async delete(@Req() req: RequestWithUser, @Param('id') id: string) {
-    return this.programsService.delete(id, req.user.userId);
+  async delete(@Param('id') id: string,@GetUser() user?: any) {
+    return this.programsService.delete(id, user._id);
   }
   
 }

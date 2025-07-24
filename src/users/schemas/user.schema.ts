@@ -15,10 +15,10 @@ export enum PremiumStatusEnum {
 }
 @Schema({ timestamps: true })
 export class User {
-  @Prop({ required: true, unique: true })
+  @Prop({ required: true })
   phone: string;
 
-  @Prop({ required: true })
+  @Prop({ required: false })
   password: string;
 
   @Prop({ default: false })
@@ -49,8 +49,7 @@ export class User {
 
   @Prop()
   email: string;
-  @Prop()
-  coachId?: string;
+
   @Prop()
   receiptUrl?: string;
   @Prop()
@@ -67,6 +66,24 @@ export class User {
 
   @Prop()
   minioKeyUrl?: string;
+
+  @Prop({ type: [String], default: [] })
+  coachesIdsThatSharedExercises?: string[];
+
+  @Prop()
+  coachIds?: string[];
+
+  @Prop({ default: false })
+  isDeleted?: boolean;
+
+  @Prop({ default: false })
+  sharedExercises?: boolean;
+
+  @Prop()
+  publicSharedExerciseLink?: string;
+
+  @Prop({ enum: ['monthly', 'quarterly', 'semi-annual'], default: 'monthly' })
+  subscriptionType: string;
 
 }
 

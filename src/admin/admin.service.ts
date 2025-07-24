@@ -69,7 +69,22 @@ export class AdminService {
     if (status === PremiumStatusEnum.ACCEPTED) {
       const now = new Date();
       const expiresAt = new Date(now);
-      expiresAt.setMonth(expiresAt.getMonth() + 1); // Add 1 month
+      const user = await this.userModel.findById(coachId);
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      switch (user.subscriptionType) {
+        case 'quarterly':
+          expiresAt.setMonth(expiresAt.getMonth() + 3);
+          break;
+        case 'semi-annual':
+          expiresAt.setMonth(expiresAt.getMonth() + 6);
+          break;
+        default:
+          expiresAt.setMonth(expiresAt.getMonth() + 1);
+      }
 
       updateData.isPremium = true;
       updateData.premiumAt = now;

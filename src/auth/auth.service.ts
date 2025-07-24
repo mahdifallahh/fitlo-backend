@@ -3,59 +3,58 @@ import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcryptjs';
 import { UserRole } from 'src/users/schemas/user.schema';
-import axios from 'axios';
+import * as Kavenegar from 'kavenegar';
 
 @Injectable()
 export class AuthService {
   // حافظه موقت برای ذخیره OTP
   private otpStore = new Map<string, { code: string; expiresAt: number }>();
+  private kavenegar: any;
 
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
-  ) {}
+  ) {
+    this.kavenegar = Kavenegar.KavenegarApi({
+      apikey: '4F7942462B693877794C556A5055444A4874614C6F573648396B45624C486256393563575879774E5757593D'
+    });
+  }
 
   private generateOtp(): string {
     return Math.floor(10000 + Math.random() * 90000).toString();
   }
 
-  // async sendOtp(phone: string): Promise<void> {
-  //   const code = this.generateOtp();
-  //   const expiresAt = Date.now() + 60_000; // 60 ثانیه اعتبار
-
-  //   this.otpStore.set(phone, { code, expiresAt });
-
-  //   // به‌جای SMS
-  //   console.log(`📱 OTP برای ${phone}: ${code}`);
-  // }
   async sendOtp(phone: string): Promise<void> {
     try {
-      const response = await axios.post(
-        'https://console.melipayamak.com/api/send/otp/03516d01c8b9472d86c9501b3398c528',
+      const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+      const expiresAt = Date.now() + 120_000; // 2 minutes expiry
 
-        { to: phone },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-  
-      const receivedCode = response.data?.code;
-      if (!receivedCode) {
-        throw new Error(response.data?.status || 'ارسال پیامک ناموفق بود');
-      }
-  
-      // ذخیره کد ملی‌پیامک در حافظه موقت
-      const expiresAt = Date.now() + 60_000;
-      this.otpStore.set(phone, { code: receivedCode, expiresAt });
-  
+      // Store the code before sending
+      this.otpStore.set(phone, { code, expiresAt });
+
+      // Format phone number (remove +98 or 0 prefix if exists)
+      const formattedPhone = phone.startsWith('0') ? phone.substring(1) : phone;
+    
+
+      // Send OTP via Kavenegar
+      await new Promise((resolve, reject) => {
+        this.kavenegar.Send({
+          message: ` کد تایید شما در فیتلو: ${code}`,
+          sender: "2000660110",
+          receptor: formattedPhone
+        }, function(response, status) {
+          
+          if (status >= 200 && status < 300 && response) {
+            resolve(response);
+          } else {
+            reject(new Error('خطا در ارسال پیامک'));
+          }
+        });
+      });
+
     } catch (error) {
-      console.error('OTP error:', {
-        message: error.message,
-        responseData: error.response?.data,
-        status: error.response?.status,
-      });      throw new InternalServerErrorException('خطا در ارسال کد تایید');
+      console.error('OTP error:', error.message);
+      throw new InternalServerErrorException('خطا در ارسال کد تایید');
     }
   }
   
@@ -78,7 +77,10 @@ export class AuthService {
     this.otpStore.delete(phone);
 
     let user = await this.usersService.findByPhone(phone);
-
+    
+    if (!password || password.trim() === '') {
+      throw new UnauthorizedException('پسورد نمی‌تواند خالی باشد');
+    }
     if (!user) {
       const hashedPassword = await bcrypt.hash(password, 10);
       user = await this.usersService.create({
@@ -179,6 +181,6 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     user.password = hashedPassword;
-    await this.usersService.update(user);
+    await user.save();
   }
 }

@@ -49,14 +49,15 @@ export class ExercisesController {
 
   @Get()
   async getAll(
-    @Req() req: RequestWithUser,
+    
     @Query() listQuery: ListQuery,
     @Query('categoryId') categoryId?: string,
+    @GetUser() user?: any,
   ) {
     if (categoryId) {
       listQuery.filters = { ...(listQuery.filters || {}), categoryId };
     }
-    return this.exercisesService.findAllByCoach(req.user.userId, listQuery);
+    return this.exercisesService.findAllByCoach(user._id, listQuery);
   }
 
   @Post()
@@ -73,16 +74,18 @@ export class ExercisesController {
     }),
   )
   async create(
-    @Req() req: RequestWithUser,
+    
     @UploadedFile() file: any,
     @Body() body: any,
+    @GetUser() user?: any
   ) {
+    const coachId = user._id;
     if (!body.name?.trim()) {
       throw new BadRequestException('نام تمرین الزامی است');
     }
 
     if (file) {
-      const user = await this.usersService.findById(req.user.userId);
+      const user = await this.usersService.findById(coachId);
       if (!user?.isPremium) {
         throw new ForbiddenException(
           'آپلود گیف فقط برای کاربران پرمیوم در دسترس است',
@@ -100,7 +103,7 @@ export class ExercisesController {
     if (file) {
       return this.exercisesService.uploadExerciseGif(
         file,
-        req.user.userId,
+        coachId,
         exerciseData,
       );
     }
@@ -108,29 +111,30 @@ export class ExercisesController {
     // CHANGE: Ensure create returns exercise with signedGifUrl (handled by ExercisesService)
     return this.exercisesService.create({
       ...exerciseData,
-      coachId: new ObjectId(req.user.userId),
+        coachId: new ObjectId(coachId),
     });
   }
 
   @Put(':id')
   async update(
-    @Req() req: RequestWithUser,
+    
     @Param('id') id: string,
     @Body() body: any,
+    @GetUser() user?: any
   ) {
     // CHANGE: No change needed; update now returns signedGifUrl via ExercisesService
-    return this.exercisesService.update(id, req.user.userId, body);
+    return this.exercisesService.update(id, user._id, body);
   }
 
   @Delete(':id')
-  async delete(@Req() req: RequestWithUser, @Param('id') id: string) {
-    return this.exercisesService.delete(id, req.user.userId);
+  async delete(@Param('id') id: string,@GetUser() user?: any) {
+    return this.exercisesService.delete(id, user._id);
   }
 
   @Post('upload-gif')
   @UseInterceptors(
     FileInterceptor('file', {
-      storage: undefined, // Always use MinIO
+      storage: undefined,
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (req, file, cb) => {
         if (file.mimetype !== 'image/gif') {
@@ -141,11 +145,12 @@ export class ExercisesController {
     }),
   )
   async uploadGif(
-    @Req() req: RequestWithUser,
+    
     @UploadedFile() file: any,
+    @GetUser() user?: any
   ) {
-    const user = await this.usersService.findById(req.user.userId);
-    if (!user?.isPremium) {
+    const userData = await this.usersService.findById(user._id);
+    if (!userData?.isPremium) {
       throw new ForbiddenException(
         'آپلود گیف فقط برای کاربران پرمیوم در دسترس است',
       );
@@ -163,44 +168,5 @@ export class ExercisesController {
     // CHANGE: Return signed URL instead of public URL for secure access
     const signedUrl = await generateSignedUrl(key);
     return { url: signedUrl };
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('share')
-  async createShareLink(
-    @GetUser() user: any,
-    @Body() shareExercisesDto: ShareExercisesDto,
-  ) {
-    return this.exercisesService.createShareLink(
-      user._id,
-      shareExercisesDto.password,
-    );
-  }
-
-  @Post('share/:shareId/validate')
-  async validateSharePassword(
-    @Param('shareId') shareId: string,
-    @Body() validateSharePasswordDto: ValidateSharePasswordDto,
-  ) {
-    return this.exercisesService.validateSharePassword(
-      shareId,
-      validateSharePasswordDto.password,
-    );
-  }
-
-  @Get('shared-exercises/:shareId')
-  async getSharedExercises(
-    @Param('shareId') shareId: string,
-    @Query('search') search?: string,
-  ) {
-    return this.exercisesService.getSharedExercises(shareId, search);
-  }
-
-  @Put('shared-exercises/toggle-share')
-  async toggleShareForAll(
-    @GetUser() user: any,
-    @Body('isShareForAll') isShareForAll: boolean,
-  ) {
-    return this.exercisesService.toggleShareForAll(user._id, isShareForAll);
   }
 }
