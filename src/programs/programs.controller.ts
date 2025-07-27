@@ -37,16 +37,16 @@ export class ProgramsController {
   async getMyPrograms(@Query() ListQuery: ListQuery,@GetUser() user?: any) {
     return this.programsService.getProgramsByCoach(user._id,ListQuery);
   }
-  @Get('student/:studentId')
+  @Get('student')
   async getProgramsByStudentId(
    
-    @Param('studentId') studentId: string,
+   
     @Query() listQuery: ListQuery,
     @GetUser() user?: any
   ) {
     return this.programsService.getProgramsByStudentId(user._id, {
       ...listQuery,
-      filters: { ...listQuery.filters, studentId },
+      filters: { ...listQuery.filters, studentId: user._id },
     });
   }
 

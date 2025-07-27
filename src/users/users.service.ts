@@ -70,6 +70,11 @@ export class UsersService {
     if (userData.shareExercises && userId) {
       userData.coachesIdsThatSharedExercises = [userId];
     }
+    if (userData.role === UserRole.STUDENT) {
+      delete userData.subscriptionType;
+      delete userData.premiumStatus;
+      delete userData.isPremium;
+    }
     const user = new this.userModel(userData);
     return user.save();
   }
@@ -129,7 +134,7 @@ export class UsersService {
     const student = await this.userModel.findOne({
       _id: id,
       isDeleted: false,
-    });
+    }).select('-password -subscriptionType -premiumStatus -isPremium');
     if (!student) {
       throw new NotFoundException('شاگرد مورد نظر یافت نشد');
     }
@@ -155,6 +160,9 @@ export class UsersService {
     return student.toObject({
       transform: (doc, ret) => {
         delete ret.password;
+        delete ret.subscriptionType;
+        delete ret.premiumStatus;
+        delete ret.isPremium;
         return ret;
       },
     });

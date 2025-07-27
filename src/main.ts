@@ -10,10 +10,21 @@ dotenv.config({ path: 'D:/myProjects/fitlo.ir/fitlo-backend/.env' });
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
- 
-  // Enable CORS
+
+  // Handle preflight requests globally
+  app.use((req, res, next) => {
+    if (req.method === 'OPTIONS') {
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS,PATCH');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   app.enableCors({
-    origin: ['http://fitlo.ir', 'https://fitlo.ir','http://localhost:5173'],
+    origin: '*',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],

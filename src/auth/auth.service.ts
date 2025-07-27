@@ -26,8 +26,8 @@ export class AuthService {
 
   async sendOtp(phone: string): Promise<void> {
     try {
-      const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
-      const expiresAt = Date.now() + 120_000; // 2 minutes expiry
+      const code = Math.floor(1000 + Math.random() * 9000).toString(); // 4-digit code
+      const expiresAt = Date.now() + 60_000; // 1 minute expiry
 
       // Store the code before sending
       this.otpStore.set(phone, { code, expiresAt });
@@ -43,10 +43,16 @@ export class AuthService {
           sender: "2000660110",
           receptor: formattedPhone
         }, function(response, status) {
-          
           if (status >= 200 && status < 300 && response) {
+            console.log('Kavenegar success:', { response, status }); // لاگ موفقیت
             resolve(response);
           } else {
+            console.error('Kavenegar error:', { response, status }); // لاگ خطا
+            console.error('Kavenegar request params:', {
+              message: ` کد تایید شما در فیتلو: ${code}`,
+              sender: "2000660110",
+              receptor: formattedPhone
+            });
             reject(new Error('خطا در ارسال پیامک'));
           }
         });
